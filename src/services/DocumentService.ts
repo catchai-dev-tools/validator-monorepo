@@ -51,7 +51,7 @@ export class DocumentService {
 
   async deleteDocumentType(id: string): Promise<boolean> {
     const result = await this.documentTypeRepository.delete(id);
-    return result.affected > 0;
+    return (result.affected ?? 0) > 0;
   }
 
   // BulkFile CRUD operations
@@ -118,7 +118,7 @@ export class DocumentService {
 
   async deleteBulkFile(id: string): Promise<boolean> {
     const result = await this.bulkFileRepository.delete(id);
-    return result.affected > 0;
+    return (result.affected ?? 0) > 0;
   }
 
   async updateIngestionStatus(id: string, status: IngestionStatus, summary?: { recordCount?: number; errors?: string[] }): Promise<BulkFile | null> {

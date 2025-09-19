@@ -83,7 +83,8 @@ export class RuleService {
 
     // If rule content is being updated, recalculate hash
     if (updateData.ruleContent) {
-      updateData.ruleContentHash = crypto.createHash('sha256').update(updateData.ruleContent).digest('hex');
+      const ruleContentHash = crypto.createHash('sha256').update(updateData.ruleContent).digest('hex');
+      Object.assign(updateData, { ruleContentHash });
     }
 
     Object.assign(rule, updateData);
@@ -92,7 +93,7 @@ export class RuleService {
 
   async deleteRule(id: string): Promise<boolean> {
     const result = await this.ruleRepository.delete(id);
-    return result.affected > 0;
+    return (result.affected ?? 0) > 0;
   }
 
   // RuleSet CRUD operations
@@ -193,7 +194,7 @@ export class RuleService {
 
   async deleteRuleSet(id: string): Promise<boolean> {
     const result = await this.ruleSetRepository.delete(id);
-    return result.affected > 0;
+    return (result.affected ?? 0) > 0;
   }
 
   async addRulesToRuleSet(ruleSetId: string, ruleIds: string[]): Promise<RuleSet | null> {
