@@ -4,6 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { AppDataSource } from './data-source';
 import routes from './routes';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +15,28 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Swagger/OpenAPI setup
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Data Validation API',
+      version: '1.0.0',
+      description: 'OpenAPI documentation for the Data Validation API',
+    },
+    servers: [
+      { url: `http://localhost:${PORT}` },
+    ],
+  },
+  // Look for JSDoc @openapi annotations in route files
+  apis: ['src/routes/**/*.ts'],
+};
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Swagger UI and raw spec
+app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerSpec) as any);
+app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
 
 // Routes
 app.use('/api', routes);

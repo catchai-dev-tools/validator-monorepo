@@ -105,6 +105,32 @@ router.delete('/users/:id', async (req: Request, res: Response) => {
 // =============================================================================
 
 // Create document type
+/**
+ * @openapi
+ * /api/document-types:
+ *   post:
+ *     summary: Create a document type (starts in DRAFT)
+ *     tags: [Document Types]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               ingestionConfig:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Created
+ *       400:
+ *         description: Bad request
+ */
 router.post('/document-types', async (req: Request, res: Response) => {
   try {
     const { name, description, ingestionConfig } = req.body;
@@ -126,6 +152,18 @@ router.post('/document-types', async (req: Request, res: Response) => {
 });
 
 // Get all document types
+/**
+ * @openapi
+ * /api/document-types:
+ *   get:
+ *     summary: List all document types
+ *     tags: [Document Types]
+ *     responses:
+ *       200:
+ *         description: Array of document types
+ *       500:
+ *         description: Server error
+ */
 router.get('/document-types', async (req: Request, res: Response) => {
   try {
     const documentTypes = await documentService.getAllDocumentTypes();
@@ -149,6 +187,38 @@ router.get('/document-types/:id', async (req: Request, res: Response) => {
 });
 
 // Update document type
+/**
+ * @openapi
+ * /api/document-types/{id}:
+ *   put:
+ *     summary: Update a document type (fails if COMPLETED)
+ *     tags: [Document Types]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               ingestionConfig:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Updated
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Not found
+ */
 router.put('/document-types/:id', async (req: Request, res: Response) => {
   try {
     const { name, description, ingestionConfig } = req.body;
@@ -169,6 +239,26 @@ router.put('/document-types/:id', async (req: Request, res: Response) => {
 });
 
 // Complete document type (transition from DRAFT to COMPLETED)
+/**
+ * @openapi
+ * /api/document-types/{id}/complete:
+ *   patch:
+ *     summary: Complete a document type (becomes immutable and usable for ingestion)
+ *     tags: [Document Types]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Completed
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Not found
+ */
 router.patch('/document-types/:id/complete', async (req: Request, res: Response) => {
   try {
     const documentType = await documentService.completeDocumentType(req.params.id);
@@ -199,6 +289,36 @@ router.delete('/document-types/:id', async (req: Request, res: Response) => {
 // =============================================================================
 
 // Create bulk file
+/**
+ * @openapi
+ * /api/bulk-files:
+ *   post:
+ *     summary: Create a bulk file record (requires COMPLETED document type)
+ *     tags: [Bulk Files]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [originalFileName, rawFileUrl, documentTypeId]
+ *             properties:
+ *               originalFileName:
+ *                 type: string
+ *               rawFileUrl:
+ *                 type: string
+ *               documentTypeId:
+ *                 type: string
+ *               cleanFileUrl:
+ *                 type: string
+ *               ingestionSummary:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Created
+ *       400:
+ *         description: Bad request
+ */
 router.post('/bulk-files', async (req: Request, res: Response) => {
   try {
     const { originalFileName, rawFileUrl, documentTypeId, cleanFileUrl, ingestionSummary } = req.body;
@@ -568,6 +688,35 @@ router.delete('/rule-sets/:id', async (req: Request, res: Response) => {
 // =============================================================================
 
 // Create validation run
+/**
+ * @openapi
+ * /api/validation-runs:
+ *   post:
+ *     summary: Create a validation run
+ *     tags: [Validation Runs]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, bulkFileId, ruleSetId]
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               bulkFileId:
+ *                 type: string
+ *               ruleSetId:
+ *                 type: string
+ *               state:
+ *                 type: string
+ *                 enum: [draft, accepted]
+ *     responses:
+ *       201:
+ *         description: Created
+ *       400:
+ *         description: Bad request
+ */
 router.post('/validation-runs', async (req: Request, res: Response) => {
   try {
     const { userId, bulkFileId, ruleSetId, state } = req.body;
