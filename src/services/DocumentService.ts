@@ -1,6 +1,6 @@
 import { Repository } from 'typeorm';
 import { AppDataSource } from '../data-source';
-import { DocumentType } from '../entities/DocumentType';
+import { DocumentType, DocumentTypeStatus } from '../entities/DocumentType';
 import { BulkFile, IngestionStatus } from '../entities/BulkFile';
 
 export class DocumentService {
@@ -18,7 +18,10 @@ export class DocumentService {
     description?: string;
     ingestionConfig?: object;
   }): Promise<DocumentType> {
-    const documentType = this.documentTypeRepository.create(data);
+    const documentType = this.documentTypeRepository.create({
+      ...data,
+      status: DocumentTypeStatus.DRAFT,
+    });
     return await this.documentTypeRepository.save(documentType);
   }
 
@@ -45,7 +48,24 @@ export class DocumentService {
       return null;
     }
 
+    // Once COMPLETED, document types are immutable
+    if (documentType.status === DocumentTypeStatus.COMPLETED) {
+      throw new Error('Completed document types cannot be modified');
+    }
+
     Object.assign(documentType, updateData);
+    return await this.documentTypeRepository.save(documentType);
+  }
+
+  async completeDocumentType(id: string): Promise<DocumentType | null> {
+    const documentType = await this.documentTypeRepository.findOne({ where: { id } });
+    if (!documentType) {
+      return null;
+    }
+    if (documentType.status === DocumentTypeStatus.COMPLETED) {
+      return documentType; // already completed
+    }
+    documentType.status = DocumentTypeStatus.COMPLETED;
     return await this.documentTypeRepository.save(documentType);
   }
 
@@ -68,6 +88,10 @@ export class DocumentService {
     
     if (!documentType) {
       throw new Error('Document type not found');
+    }
+
+    if (documentType.status !== DocumentTypeStatus.COMPLETED) {
+      throw new Error('Document type must be COMPLETED to ingest bulk files');
     }
 
     const bulkFile = this.bulkFileRepository.create({

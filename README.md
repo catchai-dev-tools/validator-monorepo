@@ -82,6 +82,7 @@ The API will be available at `http://localhost:3000`
 - `GET /api/document-types` - List all document types
 - `GET /api/document-types/:id` - Get document type by ID
 - `PUT /api/document-types/:id` - Update document type
+- `PATCH /api/document-types/:id/complete` - Mark document type as completed (immutable and usable for ingestion)
 - `DELETE /api/document-types/:id` - Delete document type
 
 ### Bulk Files
@@ -168,10 +169,14 @@ Granular forensic log with every test result:
 - `ACCEPTED`: Permanent, official validation record
 
 ### Run Statuses
-- `PENDING`: Queued for execution
-- `RUNNING`: Currently being processed
-- `COMPLETED`: Successfully finished
-- `FAILED`: Execution failed
+- `PENDING` - Queued for execution
+- `RUNNING` - Currently being processed
+- `COMPLETED` - Successfully finished
+- `FAILED` - Execution failed
+
+### Document Type Statuses
+- `DRAFT` - Definition phase; can be edited; cannot be used for ingestion
+- `COMPLETED` - Finalized; immutable; required for ingestion
 
 ### Ingestion Statuses
 - `PENDING`: File uploaded, awaiting processing
@@ -200,7 +205,7 @@ The application uses TypeORM with automatic synchronization in development mode.
 
 ### Creating a Complete Validation Workflow
 
-1. **Create a document type:**
+1. **Create a document type (starts in DRAFT):**
 ```bash
 curl -X POST http://localhost:3000/api/document-types \
   -H "Content-Type: application/json" \
@@ -211,7 +216,12 @@ curl -X POST http://localhost:3000/api/document-types \
   }'
 ```
 
-2. **Upload a bulk file:**
+2. **Complete the document type (transition DRAFT -> COMPLETED):**
+```bash
+curl -X PATCH http://localhost:3000/api/document-types/your-document-type-id/complete
+```
+
+3. **Upload a bulk file (requires COMPLETED document type):**
 ```bash
 curl -X POST http://localhost:3000/api/bulk-files \
   -H "Content-Type: application/json" \
@@ -222,7 +232,7 @@ curl -X POST http://localhost:3000/api/bulk-files \
   }'
 ```
 
-3. **Create validation rules:**
+4. **Create validation rules:**
 ```bash
 curl -X POST http://localhost:3000/api/rules \
   -H "Content-Type: application/json" \
@@ -234,7 +244,7 @@ curl -X POST http://localhost:3000/api/rules \
   }'
 ```
 
-4. **Create a rule set:**
+5. **Create a rule set:**
 ```bash
 curl -X POST http://localhost:3000/api/rule-sets \
   -H "Content-Type: application/json" \
@@ -246,7 +256,7 @@ curl -X POST http://localhost:3000/api/rule-sets \
   }'
 ```
 
-5. **Start a validation run:**
+6. **Start a validation run:**
 ```bash
 curl -X POST http://localhost:3000/api/validation-runs \
   -H "Content-Type: application/json" \

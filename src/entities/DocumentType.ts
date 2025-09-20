@@ -6,6 +6,11 @@ import {
   OneToMany,
 } from 'typeorm';
 
+export enum DocumentTypeStatus {
+  DRAFT = 'draft',
+  COMPLETED = 'completed',
+}
+
 @Entity({ name: 'DocumentTypes' })
 export class DocumentType {
   @PrimaryGeneratedColumn('uuid')
@@ -19,6 +24,13 @@ export class DocumentType {
 
   @Column({ name: 'ingestion_config', type: 'jsonb', nullable: true })
   ingestionConfig!: object;
+
+  @Column({
+    type: 'enum',
+    enum: DocumentTypeStatus,
+    default: DocumentTypeStatus.DRAFT,
+  })
+  status!: DocumentTypeStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

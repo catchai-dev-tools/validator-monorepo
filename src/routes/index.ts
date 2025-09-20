@@ -168,6 +168,19 @@ router.put('/document-types/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Complete document type (transition from DRAFT to COMPLETED)
+router.patch('/document-types/:id/complete', async (req: Request, res: Response) => {
+  try {
+    const documentType = await documentService.completeDocumentType(req.params.id);
+    if (!documentType) {
+      return res.status(404).json({ error: 'Document type not found' });
+    }
+    res.json(documentType);
+  } catch (error) {
+    res.status(400).json({ error: getErrorMessage(error) });
+  }
+});
+
 // Delete document type
 router.delete('/document-types/:id', async (req: Request, res: Response) => {
   try {
