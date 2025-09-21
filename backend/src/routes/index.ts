@@ -7,6 +7,11 @@ import { UserRole } from '../entities/User';
 import { IngestionStatus } from '../entities/BulkFile';
 import { RuleType } from '../entities/Rule';
 import { RunStatus, ValidationState } from '../entities/ValidationRun';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import type { Express } from 'express';
 
 const router = Router();
 
@@ -23,6 +28,25 @@ const userService = new UserService();
 const documentService = new DocumentService();
 const ruleService = new RuleService();
 const validationService = new ValidationService();
+
+// =============================================================================
+// AUTH & UPLOAD CONFIG
+// =============================================================================
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const uploadDir = process.env.UPLOAD_PATH || 'uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+const storage = multer.diskStorage({
+  destination: (_req: Request, _file: Express.Multer.File, cb: (error: any, destination: string) => void) => cb(null, uploadDir),
+  filename: (_req: Request, file: Express.Multer.File, cb: (error: any, filename: string) => void) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext);
+    cb(null, `${base}-${unique}${ext}`);
+  },
+});
+const upload = multer({ storage });
 
 // =============================================================================
 // USER ROUTES
@@ -870,6 +894,87 @@ router.get('/validation-runs/cleanup/drafts', async (req: Request, res: Response
     res.json(draftRuns);
   } catch (error) {
     res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// =============================================================================
+// AUTH ROUTES
+// =============================================================================
+
+/**
+ * POST /api/auth/login
+ * Body: { email: string, password: string }
+ * Returns: { token, user: { id, email, role } }
+ */
+router.post('/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    const user = await userService.getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const ok = await userService.validatePassword(user, password);
+    if (!ok) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign(
+      { sub: user.id, role: user.role, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '12h' }
+    );
+    const { passwordHash, ...safeUser } = user as any;
+    return res.json({ token, user: { id: safeUser.id, email: safeUser.email, role: safeUser.role } });
+  } catch (error) {
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Header: Authorization: Bearer <token>
+ */
+router.get('/auth/me', async (req: Request, res: Response) => {
+  try {
+    const auth = req.headers.authorization || '';
+    const parts = auth.split(' ');
+    const token = parts.length === 2 ? parts[1] : '';
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const payload = jwt.verify(token, JWT_SECRET) as any;
+    return res.json({ id: payload.sub, email: payload.email, role: payload.role });
+  } catch (_err) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+});
+
+// =============================================================================
+// FILE UPLOAD ROUTE
+// =============================================================================
+
+/**
+ * POST /api/uploads
+ * FormData: file (single)
+ * Returns: { url, storedFileName, fileName, size, mimeType }
+ */
+router.post('/uploads', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'File is required' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({
+      url: fileUrl,
+      storedFileName: req.file.filename,
+      fileName: req.file.originalname,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
