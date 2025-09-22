@@ -8,6 +8,8 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
 import fs from 'fs';
+import { UserService } from './services/UserService';
+import { UserRole } from './entities/User';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,6 +91,28 @@ async function bootstrap() {
     console.log('Initializing database connection...');
     await AppDataSource.initialize();
     console.log('Database connection established successfully');
+    
+    // Seed default admin user on first run
+    try {
+      const userService = new UserService();
+      const existingUsers = await userService.getAllUsers();
+      if (!existingUsers || existingUsers.length === 0) {
+        const adminEmail = process.env.ADMIN_EMAIL;
+        const adminPassword = process.env.ADMIN_PASSWORD;
+        if (!adminEmail || !adminPassword) {
+          console.warn('[SEED] No users found, but ADMIN_EMAIL/ADMIN_PASSWORD not set. Skipping admin seed.');
+        } else {
+          await userService.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            role: UserRole.ADMIN,
+          });
+          console.log(`[SEED] Created default admin user: ${adminEmail}`);
+        }
+      }
+    } catch (seedErr) {
+      console.warn('[SEED] Failed to seed default admin:', seedErr);
+    }
     
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

@@ -20,6 +20,78 @@ Optional (for file/object storage):
 
 ---
 
+## First-Time Database Setup
+
+These steps apply to the whole project (backend and any future frontend that relies on this API). Use either psql inside your Docker container or any Postgres client.
+
+1. **Create a dedicated database (and optional user):**
+   - Using Docker container name `pgrest-db` from your compose:
+   ```bash
+   docker exec -it pgrest-db psql -U appuser -d postgres -c "CREATE DATABASE validation_db;"
+   # Optional: create isolated user
+   docker exec -it pgrest-db psql -U appuser -d postgres -c "CREATE USER validator_user WITH PASSWORD 'StrongPassword123!';"
+   docker exec -it pgrest-db psql -U appuser -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE validation_db TO validator_user;"
+   docker exec -it pgrest-db psql -U appuser -d validation_db -c "ALTER SCHEMA public OWNER TO validator_user;"
+   ```
+_
+2. **Configure environment (.env at project root):**
+   ```env
+   PORT=3000
+   NODE_ENV=development
+
+   DB_HOST=192.168.10.108
+   DB_PORT=5432
+   DB_USERNAME=validator_user   # or appuser
+   DB_PASSWORD=StrongPassword123!
+   DB_NAME=validation_db
+   ```
+
+3. **Install dotenv (already added) and run migrations:**
+   ```bash
+   yarn typeorm migration:run -d src/data-source.ts
+   ```
+   This will also ensure the `uuid-ossp` extension exists.
+
+4. **Create a default admin user (via API):**
+   ```bash
+   curl -X POST http://localhost:3000/api/users \
+     -H "Content-Type: application/json" \
+     -d '{
+       "email": "admin@example.com",
+       "password": "ChangeMe123!",
+       "role": "admin"
+     }'
+   ```
+
+### Reset or start fresh
+
+- Truncate tables (keeps schema):
+  ```bash
+  docker exec -it pgrest-db psql -U appuser -d validation_db -c "TRUNCATE \"ValidationRuns\", \"RuleSet_Rules\", \"RuleSets\", \"Rules\", \"BulkFiles\", \"Users\", \"DocumentTypes\" RESTART IDENTITY CASCADE;"
+  ```
+
+- Drop and recreate schema (dangerous, full reset):
+  ```bash
+  docker exec -it pgrest-db psql -U appuser -d validation_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  yarn typeorm migration:run -d src/data-source.ts
+  ```
+
+- Dump and restore (backup/restore):
+  ```bash
+  # Dump
+  pg_dump -h 192.168.10.108 -U appuser -d validation_db -Fc -f validation_db.dump
+  # Restore
+  pg_restore -h 192.168.10.108 -U appuser -d validation_db -c validation_db.dump
+  ```
+
+## Documentation Layout
+
+- Root `README.md` (this file): cross-cutting topics such as project overview, database setup, and environment.
+- `backend/README.md`: backend-specific details (API endpoints, running the server, Swagger docs).
+- `frontend/README.md`: frontend-specific notes (build/run, environment, integration). If not present, it will be added as the frontend evolves.
+
+---
+
 ## Backend Setup (`backend/`)
 
 1. Install dependencies

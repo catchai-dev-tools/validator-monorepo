@@ -2,6 +2,8 @@
 
 A comprehensive Node.js API built with TypeORM for managing a multi-stage data validation platform. This system handles file ingestion, versioned rule application, and detailed multi-level reporting.
 
+> Documentation layout: This file focuses on backend/API usage. For cross-cutting topics (database creation/reset, environment), see the repository root `README.md`.
+
 ## 🏗️ Architecture Overview
 
 The platform follows a multi-stage workflow:
