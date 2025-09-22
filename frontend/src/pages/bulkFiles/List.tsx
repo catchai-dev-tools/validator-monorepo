@@ -40,8 +40,8 @@ const BulkFilesList: React.FC = () => {
       { field: "ingestionStatus", headerName: "Ingestion", width: 140 },
       { field: "rawFileUrl", headerName: "Raw URL", flex: 1, minWidth: 240 },
       { field: "cleanFileUrl", headerName: "Clean URL", flex: 1, minWidth: 240 },
-      { field: "documentType", headerName: "Doc Type", width: 180, valueGetter: (p) => p.value?.name },
-      { field: "uploadedAt", headerName: "Uploaded", width: 180, valueGetter: (p) => new Date(p.value as string).toLocaleString() },
+      { field: "documentType", headerName: "Doc Type", width: 180, valueGetter: (p: any) => p.row.documentType?.name ?? "" },
+      { field: "uploadedAt", headerName: "Uploaded", width: 180, valueGetter: (p: any) => new Date(p.row.uploadedAt).toLocaleString() },
     ],
     []
   );
