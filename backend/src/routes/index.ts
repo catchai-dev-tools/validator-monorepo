@@ -12,6 +12,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import type { Express } from 'express';
+import { AppDataSource } from '../data-source';
+import { getMinioClient, uploadBuffer } from '../utils/minio';
 
 const router = Router();
 
@@ -38,8 +40,8 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 const storage = multer.diskStorage({
-  destination: (_req: Request, _file: Express.Multer.File, cb: (error: any, destination: string) => void) => cb(null, uploadDir),
-  filename: (_req: Request, file: Express.Multer.File, cb: (error: any, filename: string) => void) => {
+  destination: (_req: any, _file: any, cb: (error: any, destination: string) => void) => cb(null, uploadDir),
+  filename: (_req: any, file: any, cb: (error: any, filename: string) => void) => {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     const base = path.basename(file.originalname, ext);
@@ -360,7 +362,13 @@ router.post('/bulk-files', async (req: Request, res: Response) => {
       cleanFileUrl,
       ingestionSummary,
     });
-    
+    // Enqueue ingestion job via Postgres NOTIFY
+    try {
+      await AppDataSource.query('SELECT pg_notify($1, $2)', ['ingest_jobs', bulkFile.id]);
+    } catch (e) {
+      // Log but do not fail API request
+      console.error('Failed to notify ingest_jobs:', e);
+    }
     res.status(201).json(bulkFile);
   } catch (error) {
     res.status(400).json({ error: getErrorMessage(error) });
@@ -960,12 +968,24 @@ router.get('/auth/me', async (req: Request, res: Response) => {
  * FormData: file (single)
  * Returns: { url, storedFileName, fileName, size, mimeType }
  */
-router.post('/uploads', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/uploads', (upload.single('file') as any), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'File is required' });
     }
-    const fileUrl = `/uploads/${req.file.filename}`;
+    let fileUrl = `/uploads/${req.file.filename}`;
+    // If MinIO configured, upload there and return MinIO URL
+    const minio = getMinioClient();
+    const bucket = process.env.MINIO_BUCKET || 'uploads';
+    if (minio) {
+      const buffer = fs.readFileSync(path.join(uploadDir, req.file.filename));
+      try {
+        const objectName = req.file.filename;
+        fileUrl = await uploadBuffer(minio as any, bucket, objectName, buffer, req.file.mimetype || 'application/octet-stream');
+      } catch (e) {
+        console.error('MinIO upload failed, falling back to local URL:', e);
+      }
+    }
     return res.status(201).json({
       url: fileUrl,
       storedFileName: req.file.filename,

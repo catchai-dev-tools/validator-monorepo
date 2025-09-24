@@ -139,23 +139,6 @@ This starts the server at `http://localhost:3000`.
 - Swagger UI: `http://localhost:3000/api-docs`
 - Health: `http://localhost:3000/health`
 
-6. Create an admin user (manual, one-off for testing)
-
-Insert an admin user directly in the DB (example uses bcrypt rounds from `.env.example`):
-
-```sql
--- Replace the password hash below with your own generated hash if desired
--- Table name is "Users" (quoted because of capital letter)
-INSERT INTO "Users" (id, email, password_hash, role, created_at)
-VALUES (
-  gen_random_uuid(),
-  'admin@test.com',
-  -- bcrypt hash for password "admin" (example):
-  '$2a$10$wqk2pT2hQYpQ0b8W0N6V.e8rVZ4m4p8w.2P3CwG7yE0bQdMZqLrO6',
-  'admin',
-  now()
-);
-```
 
 Alternatively, you can create via API:
 

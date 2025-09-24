@@ -18,6 +18,8 @@ export class DocumentService {
     description?: string;
     ingestionConfig?: object;
   }): Promise<DocumentType> {
+    // Validate ingestionConfig presence and shape
+    this.validateIngestionConfigOrThrow(data.ingestionConfig);
     const documentType = this.documentTypeRepository.create({
       ...data,
       status: DocumentTypeStatus.DRAFT,
@@ -48,12 +50,26 @@ export class DocumentService {
       return null;
     }
 
-    // Once COMPLETED, document types are immutable
-    if (documentType.status === DocumentTypeStatus.COMPLETED) {
-      throw new Error('Completed document types cannot be modified');
+    // Freeze ingestionConfig once any bulk files exist for this document type
+    if (typeof updateData.ingestionConfig !== 'undefined') {
+      // Validate new ingestion config before applying
+      this.validateIngestionConfigOrThrow(updateData.ingestionConfig);
+      const hasBulkFiles = await this.bulkFileRepository.count({ where: { documentType: { id } } });
+      if (hasBulkFiles > 0) {
+        throw new Error('ingestionConfig cannot be modified after data has been ingested');
+      }
+      // Assign ingestion config when allowed
+      (documentType as any).ingestionConfig = updateData.ingestionConfig as object;
     }
 
-    Object.assign(documentType, updateData);
+    // Name and description remain editable regardless of status
+    if (typeof updateData.name !== 'undefined') {
+      documentType.name = updateData.name as string;
+    }
+    if (typeof updateData.description !== 'undefined') {
+      documentType.description = updateData.description as string;
+    }
+
     return await this.documentTypeRepository.save(documentType);
   }
 
@@ -160,5 +176,46 @@ export class DocumentService {
     }
 
     return await this.bulkFileRepository.save(bulkFile);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Validation helpers
+  // ---------------------------------------------------------------------------
+  private validateIngestionConfigOrThrow(cfg: any) {
+    if (!cfg || typeof cfg !== 'object') {
+      throw new Error('ingestionConfig is required');
+    }
+    const { format, lineLength, fields } = cfg as any;
+    if (format !== 'fixed-width') {
+      throw new Error('ingestionConfig.format must be "fixed-width"');
+    }
+    const ll = Number(lineLength);
+    if (!Number.isInteger(ll) || ll <= 0) {
+      throw new Error('ingestionConfig.lineLength must be a positive integer');
+    }
+    if (!Array.isArray(fields) || fields.length === 0) {
+      throw new Error('ingestionConfig.fields must be a non-empty array');
+    }
+    const allowedTypes = new Set(['str', 'int', 'float']);
+    let sum = 0;
+    for (const f of fields) {
+      if (!f || typeof f !== 'object') {
+        throw new Error('ingestionConfig.fields items must be objects');
+      }
+      if (!f.name || typeof f.name !== 'string') {
+        throw new Error('Each field must have a name');
+      }
+      if (!allowedTypes.has(f.type)) {
+        throw new Error('Each field.type must be one of str, int, float');
+      }
+      const len = Number(f.length);
+      if (!Number.isInteger(len) || len <= 0) {
+        throw new Error('Each field.length must be a positive integer');
+      }
+      sum += len;
+    }
+    if (sum !== ll) {
+      throw new Error('Sum of field lengths must equal ingestionConfig.lineLength');
+    }
   }
 }
